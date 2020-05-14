@@ -1,0 +1,39 @@
+version: "3.5"
+
+services:
+  gdr_app:
+    build:
+      context: ./
+      dockerfile: docker/app/Dockerfile
+      target: dev
+      args:
+        RABBIT_USER: ${RABBIT_USER}
+        RABBIT_PASSWORD: ${RABBIT_PASSWORD}
+        RABBIT_SERVER: ${RABBIT_SERVER}
+        RABBIT_PORT: ${RABBIT_PORT}
+        RABBIT_VHOST: ${RABBIT_VHOST}
+        ENVIRONMENT: ${ENVIRONMENT}
+        LOG_TYPE: ${LOG_TYPE}
+    volumes:
+      - .:/go/src/github.com/arkrozycki/go-dead-rabbit
+      - go-modules:/go/pkg/mod
+    working_dir: /go/src/github.com/arkrozycki/go-dead-rabbit
+    restart: on-failure
+    depends_on:
+      - gdr_rabbitmq
+
+  gdr_rabbitmq:
+    build:
+      context: ./docker/rabbitmq
+    hostname: gdr_rabbitmq
+    ports:
+      - 5672:5672
+      - 15672:15672
+    healthcheck:
+      test: ["CMD", "health-check"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  go-modules:

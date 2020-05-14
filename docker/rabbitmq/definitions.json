@@ -1,0 +1,91 @@
+{
+  "bindings": [
+    {
+      "arguments": {},
+      "destination": "dev_q",
+      "destination_type": "queue",
+      "routing_key": "#",
+      "source": "dev_tx",
+      "vhost": "dev"
+    },
+    {
+      "arguments": {},
+      "destination": "dead_letter_q",
+      "destination_type": "queue",
+      "routing_key": "#",
+      "source": "dev_dlx",
+      "vhost": "dev"
+    }
+  ],
+  "exchanges": [
+    {
+      "arguments": {},
+      "auto_delete": false,
+      "durable": true,
+      "internal": false,
+      "name": "dev_tx",
+      "type": "topic",
+      "vhost": "dev"
+    },
+    {
+      "arguments": {},
+      "auto_delete": false,
+      "durable": true,
+      "internal": false,
+      "name": "dev_dlx",
+      "type": "topic",
+      "vhost": "dev"
+    }
+  ],
+  "permissions": [
+    {
+      "configure": ".*",
+      "read": ".*",
+      "user": "rabbitmq",
+      "vhost": "dev",
+      "write": ".*"
+    }
+  ],
+  "queues": [
+    {
+      "arguments": {},
+      "auto_delete": false,
+      "durable": true,
+      "name": "dev_q",
+      "vhost": "dev"
+    },
+    {
+      "arguments": {},
+      "auto_delete": false,
+      "durable": true,
+      "name": "dead_letter_q",
+      "vhost": "dev"
+    }
+  ],
+  "users": [
+    {
+      "hashing_algorithm": "rabbit_password_hashing_sha256",
+      "name": "rabbitmq",
+      "password_hash": "6pvxvpt1OssQV1+xhSztBAs2IQqzDKmp9WIpIEAusy7/nUiy",
+      "tags": "administrator"
+    }
+  ],
+  "vhosts": [
+    {
+      "name": "dev",
+      "max-connections": -1,
+      "max-queues": -1
+    }
+  ],
+  "policies": [
+    {
+      "name": "DLX",
+      "pattern": ".*",
+      "definition": {
+        "dead-letter-exchange": "dev_dlx"
+      },
+      "apply-to": "queues",
+      "vhost": "dev"
+    }
+  ]
+}
