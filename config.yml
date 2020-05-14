@@ -1,0 +1,7 @@
+listener:
+  queue:
+    name: dead_letter_q
+
+publisher:
+  exchange:
+    name: dev_tx
