@@ -13,8 +13,8 @@ import (
 func main() {
 	log.Info().Msg("Go-Dead-Rabbit Starting")
 
-	listenWithRetry() // turn up queue listener
-	api()             // turn up REST API
+	setupListenerWithRetry() // turn up queue listener
+	setupApi()               // turn up REST API
 
 	// Run continuously until interrupt
 	sig := make(chan os.Signal)
@@ -22,15 +22,16 @@ func main() {
 	<-sig
 }
 
-// listenWithRetry
+// setupListenerWithRetry
 // Runs the queue listener and controls connection retries
-func listenWithRetry() {
-	dur := 1000
+func setupListenerWithRetry() {
+	dur := 1000             // the sleep time for retries
+	retry := make(chan int) // a channel to communicate retries
+
+	// init the Listener
 	listener := &Listener{
 		config: Conf,
 	}
-
-	retry := make(chan int)
 
 	for {
 		go func() {
@@ -53,8 +54,8 @@ func listenWithRetry() {
 	}
 }
 
-// api
+// setupApi
 // Runs the RESTful API
-func api() {
+func setupApi() {
 
 }

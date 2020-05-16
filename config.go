@@ -46,12 +46,16 @@ type ExchangeConfig struct {
 
 var Conf Config
 
+// init
+// Sets up the configuration
+// reads yml and env variables into object
 func init() {
 	// configure the zero logger
 	LOG_LEVEL, _ := zerolog.ParseLevel(LOG_TYPE)
 	zerolog.TimestampFieldName = "timestamp"
 	zerolog.TimeFieldFormat = time.RFC3339
 	zerolog.SetGlobalLevel(LOG_LEVEL)
+
 	// while in dev env simply output to console
 	if ENVIRONMENT == "dev" {
 		log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
@@ -70,11 +74,12 @@ func init() {
 		log.Err(err).Msg("Unable to decode into struct")
 	}
 
+	// collect environment variables
 	Conf.Connection.Server = viper.GetString("RABBIT_SERVER")
-	Conf.Connection.Port = viper.GetString("RABBIT_Port")
-	Conf.Connection.Vhost = viper.GetString("RABBIT_Vhost")
-	Conf.Connection.User = viper.GetString("RABBIT_User")
-	Conf.Connection.Password = viper.GetString("RABBIT_Password")
+	Conf.Connection.Port = viper.GetString("RABBIT_PORT")
+	Conf.Connection.Vhost = viper.GetString("RABBIT_VHOST")
+	Conf.Connection.User = viper.GetString("RABBIT_USER")
+	Conf.Connection.Password = viper.GetString("RABBIT_PASSWORD")
 
 	RABBIT_STRING := fmt.Sprintf("%s@%s:%s/%s", Conf.Connection.User, viper.GetString("RABBIT_SERVER"), viper.GetString("RABBIT_PORT"), viper.GetString("RABBIT_VHOST"))
 

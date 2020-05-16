@@ -60,7 +60,14 @@ func (l *Listener) subscribe(retry chan<- int) error {
 		for msg := range msgs {
 			// listen on channel for new messages
 			log.Debug().Msgf("LISTENER MSG: %s", msg.Body)
-			msg.Ack(false)
+			err := l.amqpMessageHandler(msg)
+			if err != nil {
+				log.Error().Err(err)
+				msg.Reject(false)
+				continue
+			}
+
+			msg.Ack(false) // message acknowledgement
 		}
 	}()
 
@@ -69,9 +76,17 @@ func (l *Listener) subscribe(retry chan<- int) error {
 	return errors.New("disconnected")
 }
 
-// getAMQPURL
+// amqpMessageHandler
+// Processes the incoming messages
+func (l *Listener) amqpMessageHandler(message amqp.Delivery) error {
+	var err error
+
+	return err
+}
+
+// _amqpUrl
 // Generates a connection string from config
-func (l *Listener) getAMQPURL() string {
+func (l *Listener) _amqpUrl() string {
 	return fmt.Sprintf("amqp://%s:%s@%s:%s/%s",
 		l.config.Connection.User,
 		l.config.Connection.Password,
@@ -88,11 +103,11 @@ func (l *Listener) getAMQPURL() string {
 func (l *Listener) _connect() (chan *amqp.Error, error) {
 	var err error
 	// connect to rabbitmq
-	l.conn, err = amqp.Dial(l.getAMQPURL())
+	l.conn, err = amqp.Dial(l._amqpUrl())
 	if err != nil {
 		return nil, err
 	}
-	log.Info().Msgf("LISTENER connected with %s", l.getAMQPURL())
+	log.Info().Msgf("LISTENER connected with %s", l._amqpUrl())
 
 	// open channel from connection
 	l.channel, err = l.conn.Channel()
@@ -109,6 +124,7 @@ func (l *Listener) _connect() (chan *amqp.Error, error) {
 		false, // global
 	)
 
+	// capture the error disconnect channel
 	notify := l.conn.NotifyClose(make(chan *amqp.Error)) //error channel
 
 	return notify, err
@@ -138,7 +154,8 @@ func (l *Listener) _configure() error {
 }
 
 // _consume
-// Consumes messages from the queue, returns the channel used for receiving messages.
+// Consumes messages from the queue,
+// returns the channel used for receiving messages.
 func (l *Listener) _consume() (<-chan amqp.Delivery, error) {
 	// start consuming messages
 	msgs, err := l.channel.Consume(
