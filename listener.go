@@ -9,6 +9,7 @@ import (
 )
 
 // Listener
+// Struct for the listener
 type Listener struct {
 	config  Config
 	conn    *amqp.Connection
@@ -16,9 +17,13 @@ type Listener struct {
 	queue   amqp.Queue
 }
 
-// start
-func (l *Listener) subscribe() error {
+// subscribe
+// Subscribes to a queue based on configuration.
+// Executes a connect, opens channel, consumes.
+// Handles disconnects via the NotifyError channel
+func (l *Listener) subscribe(retry chan<- int) error {
 	log.Debug().Msg("listener starting up")
+
 	// connect to amqp
 	notify, err := l._connect()
 	if err != nil {
@@ -40,6 +45,7 @@ func (l *Listener) subscribe() error {
 	defer l.channel.Close()
 	defer l.conn.Close()
 
+	// channel for monitoring disconnects and errors
 	disconnect := make(chan bool)
 	// connection error monitoring
 	go func() {
@@ -58,11 +64,13 @@ func (l *Listener) subscribe() error {
 		}
 	}()
 
-	<-disconnect // stop here until disconnect
+	<-disconnect  // stop here until disconnect
+	retry <- 1000 // reset the retry duration
 	return errors.New("disconnected")
 }
 
 // getAMQPURL
+// Generates a connection string from config
 func (l *Listener) getAMQPURL() string {
 	return fmt.Sprintf("amqp://%s:%s@%s:%s/%s",
 		l.config.Connection.User,
@@ -73,6 +81,10 @@ func (l *Listener) getAMQPURL() string {
 }
 
 // _connect
+// Establishes a connection to the AMQP host,
+// retrieves a channel,
+// configures the Qos on the channel,
+// returns the amqp.NotifyClose channel for detecting errors and disconnects
 func (l *Listener) _connect() (chan *amqp.Error, error) {
 	var err error
 	// connect to rabbitmq
@@ -103,6 +115,9 @@ func (l *Listener) _connect() (chan *amqp.Error, error) {
 }
 
 // _configure
+// Passively checks that the queue in configuration exists.
+// Note, the app does not create the queue nor the bindings, those
+// need to be preemptively configured.
 func (l *Listener) _configure() error {
 	var err error
 	// Connect to an existing queue, will throw if not exist
@@ -123,6 +138,7 @@ func (l *Listener) _configure() error {
 }
 
 // _consume
+// Consumes messages from the queue, returns the channel used for receiving messages.
 func (l *Listener) _consume() (<-chan amqp.Delivery, error) {
 	// start consuming messages
 	msgs, err := l.channel.Consume(
