@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -59,11 +61,11 @@ func (l *Listener) subscribe(retry chan<- int) error {
 	go func() {
 		for msg := range msgs {
 			// listen on channel for new messages
-			log.Debug().Msgf("LISTENER MSG: %s", msg.Body)
+			log.Debug().Msgf("LISTENER MSG RECEIVED: %s", msg.MessageId)
 			err := l.amqpMessageHandler(msg)
 			if err != nil {
 				log.Error().Err(err)
-				msg.Reject(false)
+				msg.Ack(false)
 				continue
 			}
 
@@ -80,6 +82,22 @@ func (l *Listener) subscribe(retry chan<- int) error {
 // Processes the incoming messages
 func (l *Listener) amqpMessageHandler(message amqp.Delivery) error {
 	var err error
+
+	headers, err := json.Marshal(message.Headers)
+
+	log.Debug().
+		RawJSON("Headers", headers).
+		Str("CorrelationId", message.CorrelationId).
+		Str("ReplyTo", message.ReplyTo).
+		Str("MessageId", message.MessageId).
+		Str("ContentType", message.ContentType).
+		Str("RoutingKey", message.RoutingKey).
+		Str("Exchange", message.Exchange).
+		Msg("MESSAGE:")
+
+	var prettyJSON bytes.Buffer
+	err = json.Indent(&prettyJSON, headers, "", "\t")
+	Mail.send(message.RoutingKey, string(prettyJSON.Bytes()), message.Body)
 
 	return err
 }

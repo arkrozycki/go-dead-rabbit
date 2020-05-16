@@ -8,11 +8,14 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+var Mail = Mailer{Conf, nil} // global mailer object
+
 // main
 // Because its main
 func main() {
 	log.Info().Msg("Go-Dead-Rabbit Starting")
 
+	setupMailer()            // turn up the mailer
 	setupListenerWithRetry() // turn up queue listener
 	setupApi()               // turn up REST API
 
@@ -20,6 +23,10 @@ func main() {
 	sig := make(chan os.Signal)
 	signal.Notify(sig, os.Interrupt, os.Kill)
 	<-sig
+}
+
+func setupMailer() {
+	Mail._init()
 }
 
 // setupListenerWithRetry

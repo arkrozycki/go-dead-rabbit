@@ -5,3 +5,11 @@ listener:
 publisher:
   exchange:
     name: dev_tx
+
+notification:
+  mailgun: 
+    baseUrl: https://api.mailgun.net/v3
+    from: "Dead Letter <no-reply@bstocksolutions.com>"
+    to:  "ark@bstock.com"
+    # MAILGUN_API_KEY is a requied environment variable
+    # MAILGUN_API_DOMAIN is a required environment variable

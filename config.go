@@ -15,9 +15,10 @@ var ENVIRONMENT = os.Getenv("ENVIRONMENT")
 var CONFIG_FILE = "config.yml"
 
 type Config struct {
-	Connection ConnectionConfig
-	Listener   ListenerConfig
-	Publisher  PublisherConfig
+	Connection   ConnectionConfig
+	Listener     ListenerConfig
+	Publisher    PublisherConfig
+	Notification NotificationConfig
 }
 
 type ConnectionConfig struct {
@@ -42,6 +43,18 @@ type PublisherConfig struct {
 
 type ExchangeConfig struct {
 	Name string
+}
+
+type NotificationConfig struct {
+	Mailgun MailgunConfig
+}
+
+type MailgunConfig struct {
+	ApiKey  string
+	BaseUrl string
+	Domain  string
+	From    string
+	To      string
 }
 
 var Conf Config
@@ -81,10 +94,15 @@ func init() {
 	Conf.Connection.User = viper.GetString("RABBIT_USER")
 	Conf.Connection.Password = viper.GetString("RABBIT_PASSWORD")
 
-	RABBIT_STRING := fmt.Sprintf("%s@%s:%s/%s", Conf.Connection.User, viper.GetString("RABBIT_SERVER"), viper.GetString("RABBIT_PORT"), viper.GetString("RABBIT_VHOST"))
+	// set up additional env variables for mailgun
+	Conf.Notification.Mailgun.ApiKey = viper.GetString("MAILGUN_API_KEY")
+	Conf.Notification.Mailgun.Domain = viper.GetString("MAILGUN_API_DOMAIN")
 
+	RABBIT_STRING := fmt.Sprintf("%s@%s:%s/%s", Conf.Connection.User, viper.GetString("RABBIT_SERVER"), viper.GetString("RABBIT_PORT"), viper.GetString("RABBIT_VHOST"))
+	MAILGUN_STRING := fmt.Sprintf("%s@%s/%s", Conf.Notification.Mailgun.ApiKey, Conf.Notification.Mailgun.BaseUrl, Conf.Notification.Mailgun.Domain)
 	log.Info().
 		Str("RABBIT", RABBIT_STRING).
+		Str("MAILGUN", MAILGUN_STRING).
 		Str("LISTENER QUEUE", Conf.Listener.Queue.Name).
 		Str("PUBLISHER EXCHANGE", Conf.Publisher.Exchange.Name).
 		Msg("CONFIG")
