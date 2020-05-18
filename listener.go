@@ -27,19 +27,19 @@ func (l *Listener) subscribe(retry chan<- int) error {
 	log.Debug().Msg("listener starting up")
 
 	// connect to amqp
-	notify, err := l._connect()
+	notify, err := l.connect()
 	if err != nil {
 		return err
 	}
 
 	// configure queue
-	err = l._configure()
+	err = l.configure()
 	if err != nil {
 		return err
 	}
 
 	// start consuming messages
-	msgs, err := l._consume()
+	msgs, err := l.consume()
 	if err != nil {
 		return err
 	}
@@ -62,7 +62,7 @@ func (l *Listener) subscribe(retry chan<- int) error {
 		for msg := range msgs {
 			// listen on channel for new messages
 			log.Debug().Msgf("LISTENER MSG RECEIVED: %s", msg.MessageId)
-			err := l.amqpMessageHandler(msg)
+			err := l.amqpMessageHandler(msg, MailClient)
 			if err != nil {
 				log.Error().Err(err)
 				msg.Ack(false)
@@ -80,7 +80,7 @@ func (l *Listener) subscribe(retry chan<- int) error {
 
 // amqpMessageHandler
 // Processes the incoming messages
-func (l *Listener) amqpMessageHandler(message amqp.Delivery) error {
+func (l *Listener) amqpMessageHandler(message amqp.Delivery, mailer Mailer) error {
 	var err error
 
 	headers, err := json.Marshal(message.Headers)
@@ -97,14 +97,14 @@ func (l *Listener) amqpMessageHandler(message amqp.Delivery) error {
 
 	var prettyJSON bytes.Buffer
 	err = json.Indent(&prettyJSON, headers, "", "\t")
-	Mail.send(message.RoutingKey, string(prettyJSON.Bytes()), message.Body)
+	mailer.send(message.RoutingKey, string(prettyJSON.Bytes()), message.Body)
 
 	return err
 }
 
-// _amqpUrl
+// amqpUrl
 // Generates a connection string from config
-func (l *Listener) _amqpUrl() string {
+func (l *Listener) amqpUrl() string {
 	return fmt.Sprintf("amqp://%s:%s@%s:%s/%s",
 		l.config.Connection.User,
 		l.config.Connection.Password,
@@ -113,19 +113,19 @@ func (l *Listener) _amqpUrl() string {
 		l.config.Connection.Vhost)
 }
 
-// _connect
+// connect
 // Establishes a connection to the AMQP host,
 // retrieves a channel,
 // configures the Qos on the channel,
 // returns the amqp.NotifyClose channel for detecting errors and disconnects
-func (l *Listener) _connect() (chan *amqp.Error, error) {
+func (l *Listener) connect() (chan *amqp.Error, error) {
 	var err error
 	// connect to rabbitmq
-	l.conn, err = amqp.Dial(l._amqpUrl())
+	l.conn, err = amqp.Dial(l.amqpUrl())
 	if err != nil {
 		return nil, err
 	}
-	log.Info().Msgf("LISTENER connected with %s", l._amqpUrl())
+	log.Info().Msgf("LISTENER connected with %s", l.amqpUrl())
 
 	// open channel from connection
 	l.channel, err = l.conn.Channel()
@@ -148,11 +148,11 @@ func (l *Listener) _connect() (chan *amqp.Error, error) {
 	return notify, err
 }
 
-// _configure
+// configure
 // Passively checks that the queue in configuration exists.
 // Note, the app does not create the queue nor the bindings, those
 // need to be preemptively configured.
-func (l *Listener) _configure() error {
+func (l *Listener) configure() error {
 	var err error
 	// Connect to an existing queue, will throw if not exist
 	l.queue, err = l.channel.QueueDeclarePassive(
@@ -171,10 +171,10 @@ func (l *Listener) _configure() error {
 	return err
 }
 
-// _consume
+// consume
 // Consumes messages from the queue,
 // returns the channel used for receiving messages.
-func (l *Listener) _consume() (<-chan amqp.Delivery, error) {
+func (l *Listener) consume() (<-chan amqp.Delivery, error) {
 	// start consuming messages
 	msgs, err := l.channel.Consume(
 		l.config.Listener.Queue.Name, // queue

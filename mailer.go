@@ -8,24 +8,21 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type Mailer struct {
-	config   Config
-	Provider *mailgun.MailgunImpl
+type Mailer interface {
+	send(string, string, []byte) error
 }
 
-func (m *Mailer) _init() {
-	m.Provider = mailgun.NewMailgun(Conf.Notification.Mailgun.Domain, Conf.Notification.Mailgun.ApiKey)
+type Mail struct {
+	config Config
 }
 
 // send
 // Email something to someone/thing
-func (m *Mailer) send(subject string, body string, attachment []byte) {
-
-	// log.Debug().Msg("MAILER")
-
+func (m Mail) send(subject string, body string, attachment []byte) error {
+	mg := mailgun.NewMailgun(m.config.Notification.Mailgun.Domain, m.config.Notification.Mailgun.ApiKey)
 	// The message object allows you to add attachments and Bcc recipients
-	message := m.Provider.NewMessage(
-		Conf.Notification.Mailgun.From,
+	message := mg.NewMessage(
+		m.config.Notification.Mailgun.From,
 		subject,
 		body,
 		Conf.Notification.Mailgun.To)
@@ -36,7 +33,7 @@ func (m *Mailer) send(subject string, body string, attachment []byte) {
 	defer cancel()
 
 	// Send the message with a 10 second timeout
-	resp, id, err := m.Provider.Send(ctx, message)
+	resp, id, err := mg.Send(ctx, message)
 
 	if err != nil {
 		log.Error().Err(err)
@@ -46,4 +43,6 @@ func (m *Mailer) send(subject string, body string, attachment []byte) {
 		Str("ID", id).
 		Str("Resp", resp).
 		Msgf("MAILER")
+
+	return err
 }

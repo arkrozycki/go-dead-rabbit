@@ -8,7 +8,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-var Mail = Mailer{Conf, nil} // global mailer object
+var MailClient Mailer
 
 // main
 // Because its main
@@ -26,7 +26,8 @@ func main() {
 }
 
 func setupMailer() {
-	Mail._init()
+	// Mail._init()
+	MailClient = Mail{Conf} // global mailer object
 }
 
 // setupListenerWithRetry
