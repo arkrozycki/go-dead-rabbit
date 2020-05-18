@@ -27,7 +27,7 @@ func main() {
 
 func setupMailer() {
 	// Mail._init()
-	MailClient = &Mail{Conf} // global mailer object
+	MailClient = &Mail{Conf, nil} // global mailer object
 }
 
 // setupListenerWithRetry
@@ -45,14 +45,14 @@ func setupListenerWithRetry() {
 		go func() {
 			err := listener.subscribe(retry)
 			if err != nil {
-				log.Info().Msg("LISTENER not connected")
+				log.Info().Msg("MAIN: Listener not connected")
 				retry <- dur
 			}
 		}()
 
 		dur = <-retry // wait until disconnect
 
-		log.Debug().Msgf("LISTENER retry connection in %vms", dur)
+		log.Debug().Msgf("MAIN: Retry listener connection in %vms", dur)
 		time.Sleep(time.Duration(dur) * time.Millisecond) // pause before reattempt connection
 		if dur < 128001 {
 			dur = dur * 2 // increase duration
@@ -65,5 +65,9 @@ func setupListenerWithRetry() {
 // setupApi
 // Runs the RESTful API
 func setupApi() {
-
+	api := &Server{Conf}
+	err := api.start()
+	if err != nil {
+		log.Error().Err(err)
+	}
 }

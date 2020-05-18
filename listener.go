@@ -17,6 +17,7 @@ type Listener struct {
 	conn    *amqp.Connection
 	channel *amqp.Channel
 	queue   amqp.Queue
+	mail    Mailer
 }
 
 // subscribe
@@ -24,7 +25,7 @@ type Listener struct {
 // Executes a connect, opens channel, consumes.
 // Handles disconnects via the NotifyError channel
 func (l *Listener) subscribe(retry chan<- int) error {
-	log.Debug().Msg("listener starting up")
+	log.Debug().Msg("LISTENER: Starting up")
 
 	// connect to amqp
 	notify, err := l.connect()
@@ -61,7 +62,7 @@ func (l *Listener) subscribe(retry chan<- int) error {
 	go func() {
 		for msg := range msgs {
 			// listen on channel for new messages
-			log.Debug().Msgf("LISTENER MSG RECEIVED: %s", msg.MessageId)
+			log.Debug().Msgf("LISTENER: Msg received - %s", msg.MessageId)
 			err := l.amqpMessageHandler(msg, MailClient)
 			if err != nil {
 				log.Error().Err(err)
@@ -83,7 +84,7 @@ func (l *Listener) subscribe(retry chan<- int) error {
 func (l *Listener) amqpMessageHandler(message amqp.Delivery, mailer Mailer) error {
 	var err error
 
-	headers, err := json.Marshal(message.Headers)
+	headers, err := json.Marshal(message)
 
 	log.Debug().
 		RawJSON("Headers", headers).
@@ -93,7 +94,7 @@ func (l *Listener) amqpMessageHandler(message amqp.Delivery, mailer Mailer) erro
 		Str("ContentType", message.ContentType).
 		Str("RoutingKey", message.RoutingKey).
 		Str("Exchange", message.Exchange).
-		Msg("MESSAGE:")
+		Msg("LISTENER:")
 
 	var prettyJSON bytes.Buffer
 	err = json.Indent(&prettyJSON, headers, "", "\t")
@@ -101,7 +102,8 @@ func (l *Listener) amqpMessageHandler(message amqp.Delivery, mailer Mailer) erro
 		return err
 	}
 
-	err = mailer.send(message.RoutingKey, string(prettyJSON.Bytes()), message.Body)
+	// attachmentName := fmt.Sprintf("msg_%s.rabbit", message.Headers["proto"])
+	err = mailer.send(message.RoutingKey, string(prettyJSON.Bytes()))
 	return err
 }
 
@@ -128,14 +130,14 @@ func (l *Listener) connect() (chan *amqp.Error, error) {
 	if err != nil {
 		return nil, err
 	}
-	log.Info().Msgf("LISTENER connected with %s", l.amqpUrl())
+	log.Info().Msgf("LISTENER: Connected with %s", l.amqpUrl())
 
 	// open channel from connection
 	l.channel, err = l.conn.Channel()
 	if err != nil {
 		return nil, err
 	}
-	log.Debug().Msg("LISTENER open channel success")
+	log.Debug().Msg("LISTENER: Open channel success")
 
 	// set the QoS for the channel
 	// we will be pulling only 1 at a time for simplicity
@@ -169,7 +171,7 @@ func (l *Listener) configure() error {
 	if err != nil {
 		return err
 	}
-	log.Debug().Msgf("LISTENER queue exists %s", l.config.Listener.Queue.Name)
+	log.Debug().Msgf("LISTENER: Queue exists - %s", l.config.Listener.Queue.Name)
 
 	return err
 }

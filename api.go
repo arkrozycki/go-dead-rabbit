@@ -2,6 +2,15 @@ package main
 
 import "github.com/rs/zerolog/log"
 
-func RunAPI() {
-	log.Debug().Msg("api run")
+type Api interface {
+	start() error
+}
+
+type Server struct {
+	config Config
+}
+
+func (s *Server) start() error {
+	log.Debug().Msg("API: Starting up")
+	return nil
 }

@@ -9,25 +9,42 @@ import (
 )
 
 type Mailer interface {
-	send(string, string, []byte) error
+	send(string, string) error
 }
 
 type Mail struct {
 	config Config
+	client *mailgun.MailgunImpl
+}
+
+func (m *Mail) getClient() *mailgun.MailgunImpl {
+	if m.client == nil {
+		m.client = mailgun.NewMailgun(m.config.Notification.Mailgun.Domain, m.config.Notification.Mailgun.ApiKey)
+	}
+
+	return m.client
+}
+
+func (m *Mail) Message(from string, to string, subject string, body string) *mailgun.Message {
+	// The message object allows you to add attachments and Bcc recipients
+	return m.client.NewMessage(
+		from,
+		subject,
+		body,
+		to)
 }
 
 // send
 // Email something to someone/thing
-func (m *Mail) send(subject string, body string, attachment []byte) error {
-	mg := mailgun.NewMailgun(m.config.Notification.Mailgun.Domain, m.config.Notification.Mailgun.ApiKey)
-	// The message object allows you to add attachments and Bcc recipients
-	message := mg.NewMessage(
-		m.config.Notification.Mailgun.From,
+func (m *Mail) send(subject string, body string) error {
+	mg := m.getClient()
+	message := m.Message(
+		Conf.Notification.Mailgun.From,
+		Conf.Notification.Mailgun.To,
 		subject,
-		body,
-		Conf.Notification.Mailgun.To)
+		body)
 
-	message.AddBufferAttachment("something.b64", attachment)
+	// message.AddBufferAttachment(attachmentFilename, attachment)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
@@ -42,7 +59,7 @@ func (m *Mail) send(subject string, body string, attachment []byte) error {
 	log.Debug().
 		Str("ID", id).
 		Str("Resp", resp).
-		Msgf("MAILER")
+		Msgf("MAILER:")
 
 	return err
 }

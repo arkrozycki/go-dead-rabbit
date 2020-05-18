@@ -20,7 +20,7 @@ type MailerMock struct {
 	config Config
 }
 
-func (m *MailerMock) send(subject string, body string, attachment []byte) error {
+func (m *MailerMock) send(subject string, body string) error {
 	return nil
 }
 
