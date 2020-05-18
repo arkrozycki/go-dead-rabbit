@@ -20,11 +20,11 @@ type MailerMock struct {
 	config Config
 }
 
-func (m MailerMock) send(subject string, body string, attachment []byte) error {
+func (m *MailerMock) send(subject string, body string, attachment []byte) error {
 	return nil
 }
 
-var MailClientMock = MailerMock{conf}
+var MailClientMock = &MailerMock{conf}
 
 var simpleListener = &Listener{
 	config: conf,
@@ -50,7 +50,7 @@ func TestAmqpMessageHandler(t *testing.T) {
 
 	err := simpleListener.amqpMessageHandler(msg, MailClientMock)
 	if err != nil {
-		t.Error(err)
+		t.Errorf("actual: %v, expected: nil", err)
 	}
 }
 

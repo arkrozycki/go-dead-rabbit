@@ -18,7 +18,7 @@ type Mail struct {
 
 // send
 // Email something to someone/thing
-func (m Mail) send(subject string, body string, attachment []byte) error {
+func (m *Mail) send(subject string, body string, attachment []byte) error {
 	mg := mailgun.NewMailgun(m.config.Notification.Mailgun.Domain, m.config.Notification.Mailgun.ApiKey)
 	// The message object allows you to add attachments and Bcc recipients
 	message := mg.NewMessage(

@@ -97,8 +97,11 @@ func (l *Listener) amqpMessageHandler(message amqp.Delivery, mailer Mailer) erro
 
 	var prettyJSON bytes.Buffer
 	err = json.Indent(&prettyJSON, headers, "", "\t")
-	mailer.send(message.RoutingKey, string(prettyJSON.Bytes()), message.Body)
+	if err != nil {
+		return err
+	}
 
+	err = mailer.send(message.RoutingKey, string(prettyJSON.Bytes()), message.Body)
 	return err
 }
 

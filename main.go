@@ -27,7 +27,7 @@ func main() {
 
 func setupMailer() {
 	// Mail._init()
-	MailClient = Mail{Conf} // global mailer object
+	MailClient = &Mail{Conf} // global mailer object
 }
 
 // setupListenerWithRetry
