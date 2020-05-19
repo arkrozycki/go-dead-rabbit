@@ -8,14 +8,12 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-var MailClient Mailer
-
 // main
 // Because its main
 func main() {
 	log.Info().Msg("Go-Dead-Rabbit Starting")
 
-	setupMailer()            // turn up the mailer
+	// setupMailer()            // turn up the mailer
 	setupListenerWithRetry() // turn up queue listener
 	setupApi()               // turn up REST API
 
@@ -25,10 +23,10 @@ func main() {
 	<-sig
 }
 
-func setupMailer() {
-	// Mail._init()
-	MailClient = &Mail{Conf, nil} // global mailer object
-}
+// func setupMailer() {
+// 	// MailClient := NewMailgunClient(Conf)
+// 	// MailClient = &MailgunMailer{Conf, mailer} // global mailer object
+// }
 
 // setupListenerWithRetry
 // Runs the queue listener and controls connection retries

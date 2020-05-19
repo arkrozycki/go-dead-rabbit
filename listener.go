@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/mailgun/mailgun-go/v4"
 	"github.com/rs/zerolog/log"
 	"github.com/streadway/amqp"
 )
@@ -20,12 +21,18 @@ type Listener struct {
 	mail    Mailer
 }
 
+var MailClient Mailer
+
 // subscribe
 // Subscribes to a queue based on configuration.
 // Executes a connect, opens channel, consumes.
 // Handles disconnects via the NotifyError channel
 func (l *Listener) subscribe(retry chan<- int) error {
 	log.Debug().Msg("LISTENER: Starting up")
+
+	MailClient = &MailgunMailer{
+		mailgun.NewMailgun(Conf.Notification.Mailgun.Domain, Conf.Notification.Mailgun.ApiKey),
+	}
 
 	// connect to amqp
 	notify, err := l.connect()
@@ -103,7 +110,7 @@ func (l *Listener) amqpMessageHandler(message amqp.Delivery, mailer Mailer) erro
 	}
 
 	// attachmentName := fmt.Sprintf("msg_%s.rabbit", message.Headers["proto"])
-	err = mailer.send(message.RoutingKey, string(prettyJSON.Bytes()))
+	err = SendMail(mailer, message.RoutingKey, string(prettyJSON.Bytes()))
 	return err
 }
 

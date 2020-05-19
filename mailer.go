@@ -9,48 +9,52 @@ import (
 )
 
 type Mailer interface {
-	send(string, string) error
+	NewMessage(string, string, string, ...string) *Message
+	Send(context.Context, *Message) (string, string, error)
 }
 
-type Mail struct {
-	config Config
+type Message interface{}
+
+type MailgunMessage struct {
+	content *mailgun.Message
+}
+
+type MailgunMailer struct {
 	client *mailgun.MailgunImpl
 }
 
-func (m *Mail) getClient() *mailgun.MailgunImpl {
-	if m.client == nil {
-		m.client = mailgun.NewMailgun(m.config.Notification.Mailgun.Domain, m.config.Notification.Mailgun.ApiKey)
-	}
+func (m *MailgunMailer) NewMessage(from string, subject string, body string, to ...string) *Message {
+	// var c Message
 
-	return m.client
-}
-
-func (m *Mail) Message(from string, to string, subject string, body string) *mailgun.Message {
-	// The message object allows you to add attachments and Bcc recipients
-	return m.client.NewMessage(
-		from,
+	content := m.client.NewMessage(
+		Conf.Notification.Mailgun.From,
 		subject,
 		body,
-		to)
+		Conf.Notification.Mailgun.To,
+	)
+	c := &Message{content}
+	return c
+}
+
+func (m *MailgunMailer) Send(ctx context.Context, message *Message) (string, string, error) {
+	resp, id, err := m.client.Send(ctx, message.content)
+	return resp, id, err
 }
 
 // send
 // Email something to someone/thing
-func (m *Mail) send(subject string, body string) error {
-	mg := m.getClient()
-	message := m.Message(
+func SendMail(client Mailer, subject string, body string) error {
+	message := client.NewMessage(
 		Conf.Notification.Mailgun.From,
-		Conf.Notification.Mailgun.To,
 		subject,
-		body)
-
-	// message.AddBufferAttachment(attachmentFilename, attachment)
+		body,
+		Conf.Notification.Mailgun.To,
+	)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second*10)
 	defer cancel()
-
 	// Send the message with a 10 second timeout
-	resp, id, err := mg.Send(ctx, message)
+	resp, id, err := client.Send(ctx, message)
 
 	if err != nil {
 		log.Error().Err(err)
