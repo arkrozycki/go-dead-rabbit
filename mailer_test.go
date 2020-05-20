@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"testing"
 )
 
@@ -14,24 +13,19 @@ type MockMailer struct {
 	client MockMailerClient
 }
 
-func (m *MockMailer) NewMessage(from string, subject string, body string, to ...string) *Message {
-	msg := &Message{
-		subject: subject,
-		body:    body,
-	}
-	return msg
-}
-
 func (m *MockMailer) Send(ctx context.Context, message *Message) (string, string, error) {
-	fmt.Printf("\n\n === %v ====\n\n", message)
 	var err error
+	if message.subject == "should error" {
+		return "", "", errors.New("send failed")
+	}
+
 	return "", "", err
 }
 
 var MockMailClient Mailer
 
 // TestSendMail
-func TestSendMail(t *testing.T) {
+func TestSendMailSuccess(t *testing.T) {
 	MockMailClient = &MockMailer{}
 	actual := SendMail(MockMailClient, "subject", "body")
 	if actual != nil {
