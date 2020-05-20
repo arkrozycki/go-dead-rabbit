@@ -1,68 +1,55 @@
 package main
 
-// var conf = Config{
-// 	Connection: ConnectionConfig{
-// 		Server:   "testServer",
-// 		Port:     "5672",
-// 		Vhost:    "vhost",
-// 		User:     "tester",
-// 		Password: "password",
-// 	},
-// }
+import (
+	"testing"
 
-// // type MailerMock struct {
-// // 	config Config
-// // }
+	"github.com/streadway/amqp"
+)
 
-// // func (m *MailerMock) send(subject string, body string) error {
-// // 	return nil
-// // }
+var simpleListener = &Listener{
+	config: MockConf,
+	mail:   GetMockMailClient(),
+}
 
-// // var MailClientMock = &MailerMock{conf}
+// TestSubscribe
+func TestSubscribe(t *testing.T) {
 
-// var simpleListener = &Listener{
-// 	config: conf,
-// }
+}
 
-// // TestSubscribe
-// func TestSubscribe(t *testing.T) {
+// TestAmqpMessageHandler
+func TestAmqpMessageHandler(t *testing.T) {
+	msg := amqp.Delivery{
+		CorrelationId: "none",
+		ReplyTo:       "reply",
+		MessageId:     "123",
+		ContentType:   "binary",
+		RoutingKey:    "evt.bstock.all",
+		Exchange:      "fake",
+		Headers:       amqp.Table{},
+		Body:          []byte("fake data"),
+	}
 
-// }
+	err := simpleListener.amqpMessageHandler(msg)
+	if err != nil {
+		t.Errorf("actual: %v, expected: nil", err)
+	}
+}
 
-// // TestAmqpMessageHandler
-// func TestAmqpMessageHandler(t *testing.T) {
-// 	msg := amqp.Delivery{
-// 		CorrelationId: "none",
-// 		ReplyTo:       "reply",
-// 		MessageId:     "123",
-// 		ContentType:   "binary",
-// 		RoutingKey:    "evt.bstock.all",
-// 		Exchange:      "fake",
-// 		Headers:       amqp.Table{},
-// 		Body:          []byte("fake data"),
-// 	}
+// TestAmqpUrl
+func TestAmqpUrl(t *testing.T) {
+	expected := "amqp://tester:password@testServer:5672/vhost"
+	actual := simpleListener.amqpUrl()
 
-// 	err := simpleListener.amqpMessageHandler(msg, MailClientMock)
-// 	if err != nil {
-// 		t.Errorf("actual: %v, expected: nil", err)
-// 	}
-// }
+	if actual != expected {
+		t.Errorf("actual: %s, expected: %s.", actual, expected)
+	}
+}
 
-// // TestAmqpUrl
-// func TestAmqpUrl(t *testing.T) {
-// 	expected := "amqp://tester:password@testServer:5672/vhost"
-// 	actual := simpleListener.amqpUrl()
+// TestConnect
+func TestConnect(t *testing.T) {}
 
-// 	if actual != expected {
-// 		t.Errorf("actual: %s, expected: %s.", actual, expected)
-// 	}
-// }
+// TestConfigure
+func TestConfigure(t *testing.T) {}
 
-// // TestConnect
-// func TestConnect(t *testing.T) {}
-
-// // TestConfigure
-// func TestConfigure(t *testing.T) {}
-
-// // TestConsume
-// func TestConsume(t *testing.T) {}
+// TestConsume
+func TestConsume(t *testing.T) {}

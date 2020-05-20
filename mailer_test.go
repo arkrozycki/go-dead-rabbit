@@ -2,43 +2,55 @@ package main
 
 import (
 	"context"
-	"errors"
+	"reflect"
 	"testing"
+
+	"github.com/mailgun/mailgun-go/v4"
 )
 
-type MockMailerClient struct {
+type MockMailClient struct{}
+
+func (m *MockMailClient) NewMessage(from string, subject string, body string, to ...string) *mailgun.Message {
+	c := mailgun.NewMailgun("", "")
+	return c.NewMessage(from, subject, body, to[0])
 }
 
-type MockMailer struct {
-	client MockMailerClient
-}
-
-func (m *MockMailer) Send(ctx context.Context, message *Message) (string, string, error) {
+func (m *MockMailClient) Send(ctx context.Context, message *mailgun.Message) (string, string, error) {
 	var err error
-	if message.subject == "should error" {
-		return "", "", errors.New("send failed")
-	}
-
 	return "", "", err
 }
 
-var MockMailClient Mailer
+var MockMailer MailClient
+
+func GetMockMailClient() MailClient {
+	var m MailClient
+	m = &MockMailClient{}
+	return m
+}
 
 // TestSendMail
 func TestSendMailSuccess(t *testing.T) {
-	MockMailClient = &MockMailer{}
-	actual := SendMail(MockMailClient, "subject", "body")
+	MockMailer = &MockMailClient{}
+
+	msg := &Message{
+		from:    "from_test",
+		to:      "to_test",
+		subject: "subject",
+		body:    "body",
+	}
+
+	_, _, actual := SendMail(MockMailer, msg)
 	if actual != nil {
 		t.Errorf("actual: %s, expected: %v.", actual, nil)
 	}
 }
 
-// TestSendMailError
-func TestSendMailError(t *testing.T) {
-	MockMailClient = &MockMailer{}
-	actual := SendMail(MockMailClient, "should error", "body")
-	expected := errors.New("send failed")
-	if actual != expected {
-		t.Errorf("actual: %v, expected: %v", actual, expected)
+//  TestGetMailClient
+func TestGetMailClient(t *testing.T) {
+	c := mailgun.NewMailgun("", "")
+	m := GetMailClient("", "")
+	if reflect.TypeOf(m) != reflect.TypeOf(c) {
+		t.Errorf("%s", reflect.TypeOf(m))
 	}
+
 }

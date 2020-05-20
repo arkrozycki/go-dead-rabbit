@@ -37,6 +37,7 @@ func setupListenerWithRetry() {
 	// init the Listener
 	listener := &Listener{
 		config: Conf,
+		mail:   GetMailClient(Conf.Notification.Mailgun.Domain, Conf.Notification.Mailgun.ApiKey),
 	}
 
 	for {

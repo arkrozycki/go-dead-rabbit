@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/mailgun/mailgun-go/v4"
 	"github.com/rs/zerolog/log"
 	"github.com/streadway/amqp"
 )
@@ -18,10 +17,8 @@ type Listener struct {
 	conn    *amqp.Connection
 	channel *amqp.Channel
 	queue   amqp.Queue
-	mail    Mailer
+	mail    MailClient
 }
-
-var MailClient Mailer
 
 // subscribe
 // Subscribes to a queue based on configuration.
@@ -29,10 +26,6 @@ var MailClient Mailer
 // Handles disconnects via the NotifyError channel
 func (l *Listener) subscribe(retry chan<- int) error {
 	log.Debug().Msg("LISTENER: Starting up")
-
-	MailClient = &MailgunMailer{
-		mailgun.NewMailgun(Conf.Notification.Mailgun.Domain, Conf.Notification.Mailgun.ApiKey),
-	}
 
 	// connect to amqp
 	notify, err := l.connect()
@@ -70,7 +63,7 @@ func (l *Listener) subscribe(retry chan<- int) error {
 		for msg := range msgs {
 			// listen on channel for new messages
 			log.Debug().Msgf("LISTENER: Msg received - %s", msg.MessageId)
-			err := l.amqpMessageHandler(msg, MailClient)
+			err := l.amqpMessageHandler(msg)
 			if err != nil {
 				log.Error().Err(err)
 				msg.Ack(false)
@@ -88,7 +81,7 @@ func (l *Listener) subscribe(retry chan<- int) error {
 
 // amqpMessageHandler
 // Processes the incoming messages
-func (l *Listener) amqpMessageHandler(message amqp.Delivery, mailer Mailer) error {
+func (l *Listener) amqpMessageHandler(message amqp.Delivery) error {
 	var err error
 
 	headers, err := json.Marshal(message)
@@ -110,7 +103,14 @@ func (l *Listener) amqpMessageHandler(message amqp.Delivery, mailer Mailer) erro
 	}
 
 	// attachmentName := fmt.Sprintf("msg_%s.rabbit", message.Headers["proto"])
-	err = SendMail(mailer, message.RoutingKey, string(prettyJSON.Bytes()))
+	msg := &Message{
+		from:    Conf.Notification.Mailgun.From,
+		to:      Conf.Notification.Mailgun.To,
+		subject: message.RoutingKey,
+		body:    string(prettyJSON.Bytes()),
+	}
+	resp, id, err := SendMail(l.mail, msg)
+	log.Debug().Str("ID", id).Str("Resp", resp).Msgf("MAILER:")
 	return err
 }
 
