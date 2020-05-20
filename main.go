@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
+	"github.com/streadway/amqp"
 )
 
 // main
@@ -14,8 +15,8 @@ func main() {
 	log.Info().Msg("Go-Dead-Rabbit Starting")
 
 	// setupMailer()            // turn up the mailer
-	setupListenerWithRetry() // turn up queue listener
-	setupApi()               // turn up REST API
+	SetupListenerWithRetry() // turn up queue listener
+	SetupApi()               // turn up REST API
 
 	// Run continuously until interrupt
 	sig := make(chan os.Signal)
@@ -30,7 +31,7 @@ func main() {
 
 // setupListenerWithRetry
 // Runs the queue listener and controls connection retries
-func setupListenerWithRetry() {
+func SetupListenerWithRetry() {
 	dur := 1000             // the sleep time for retries
 	retry := make(chan int) // a channel to communicate retries
 
@@ -42,11 +43,23 @@ func setupListenerWithRetry() {
 
 	for {
 		go func() {
-			err := listener.subscribe(retry)
+			var conn AmqpConnection
+			var client AmqpChannel
+			// conn, err := GetAMQPConnection(GetAMQPUrl(Conf))
+			conn, err := amqp.Dial(GetAMQPUrl(Conf))
 			if err != nil {
 				log.Info().Msg("MAIN: Listener not connected")
-				retry <- dur
 			}
+			client, err = GetAMQPChannel(conn)
+			if err != nil {
+				log.Info().Msg("MAIN: Channel not connected")
+			}
+			err = listener.Subscribe(client)
+			// err := listener.subscribe(retry)
+			// if err != nil {
+			// 	log.Info().Msg("MAIN: Listener not connected")
+			// 	retry <- dur
+			// }
 		}()
 
 		dur = <-retry // wait until disconnect
@@ -63,7 +76,7 @@ func setupListenerWithRetry() {
 
 // setupApi
 // Runs the RESTful API
-func setupApi() {
+func SetupApi() {
 	api := &Server{Conf}
 	err := api.start()
 	if err != nil {

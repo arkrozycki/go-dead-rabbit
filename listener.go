@@ -1,14 +1,57 @@
 package main
 
 import (
-	"bytes"
-	"encoding/json"
-	"errors"
 	"fmt"
 
-	"github.com/rs/zerolog/log"
 	"github.com/streadway/amqp"
 )
+
+type Amqp interface {
+	Dial(string) (*amqp.Connection, error)
+}
+
+type AmqpConnection interface {
+	Channel() (AmqpChannel, error)
+}
+
+type AmqpChannel interface {
+	Qos(int, int, bool) error
+}
+
+// amqpUrl
+// Generates a connection string from config
+func GetAMQPUrl(conf Config) string {
+	return fmt.Sprintf("amqp://%s:%s@%s:%s/%s",
+		conf.Connection.User,
+		conf.Connection.Password,
+		conf.Connection.Server,
+		conf.Connection.Port,
+		conf.Connection.Vhost)
+}
+
+// GetAMQPConnection
+// func GetAMQPConnection(connectionUrl string) (AmqpConnection, error) {
+// 	var conn AmqpConnection
+// 	conn, err := amqp.Dial(connectionUrl)
+// 	return conn, err
+// }
+
+// GetAMQPChannel
+func GetAMQPChannel(conn AmqpConnection) (AmqpChannel, error) {
+	var channel AmqpChannel
+	channel, err := conn.Channel()
+	if err != nil {
+		return nil, err
+	}
+
+	err = channel.Qos(
+		1,     // prefetch count
+		0,     // prefetch size
+		false, // global
+	)
+
+	return channel, err
+}
 
 // Listener
 // Struct for the listener
@@ -19,6 +62,15 @@ type Listener struct {
 	queue   amqp.Queue
 	mail    MailClient
 }
+
+// Subscribe
+func (l *Listener) Subscribe(client AmqpChannel) error {
+	var err error
+	return err
+}
+
+/*
+
 
 // subscribe
 // Subscribes to a queue based on configuration.
@@ -200,3 +252,4 @@ func (l *Listener) consume() (<-chan amqp.Delivery, error) {
 
 	return msgs, err
 }
+*/

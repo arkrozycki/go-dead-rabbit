@@ -52,5 +52,4 @@ func TestGetMailClient(t *testing.T) {
 	if reflect.TypeOf(m) != reflect.TypeOf(c) {
 		t.Errorf("%s", reflect.TypeOf(m))
 	}
-
 }
