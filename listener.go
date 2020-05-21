@@ -6,16 +6,30 @@ import (
 	"github.com/streadway/amqp"
 )
 
-type Amqp interface {
-	Dial(string) (*amqp.Connection, error)
+type (
+	Amqp interface {
+		dial(string) error
+		getChannel() error
+	}
+
+	RabbitConnection struct {
+		connection *amqp.Connection
+		channel    *amqp.Channel
+	}
+)
+
+// dial
+func (r *RabbitConnection) dial(uri string) error {
+	var err error
+	r.connection, err = amqp.Dial(uri)
+	return err
 }
 
-type AmqpConnection interface {
-	Channel() (AmqpChannel, error)
-}
-
-type AmqpChannel interface {
-	Qos(int, int, bool) error
+// channel
+func (r *RabbitConnection) getChannel() error {
+	var err error
+	r.channel, err = r.connection.Channel()
+	return err
 }
 
 // amqpUrl
@@ -29,43 +43,17 @@ func GetAMQPUrl(conf Config) string {
 		conf.Connection.Vhost)
 }
 
-// GetAMQPConnection
-// func GetAMQPConnection(connectionUrl string) (AmqpConnection, error) {
-// 	var conn AmqpConnection
-// 	conn, err := amqp.Dial(connectionUrl)
-// 	return conn, err
-// }
-
-// GetAMQPChannel
-func GetAMQPChannel(conn AmqpConnection) (AmqpChannel, error) {
-	var channel AmqpChannel
-	channel, err := conn.Channel()
-	if err != nil {
-		return nil, err
-	}
-
-	err = channel.Qos(
-		1,     // prefetch count
-		0,     // prefetch size
-		false, // global
-	)
-
-	return channel, err
-}
-
 // Listener
 // Struct for the listener
 type Listener struct {
-	config  Config
-	conn    *amqp.Connection
-	channel *amqp.Channel
-	queue   amqp.Queue
-	mail    MailClient
+	config Config
+	mail   MailClient
+	client Amqp
 }
 
-// Subscribe
-func (l *Listener) Subscribe(client AmqpChannel) error {
+func (l *Listener) Subscribe(client Amqp) error {
 	var err error
+	l.client = client
 	return err
 }
 

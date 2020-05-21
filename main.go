@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
-	"github.com/streadway/amqp"
 )
 
 // main
@@ -24,11 +23,6 @@ func main() {
 	<-sig
 }
 
-// func setupMailer() {
-// 	// MailClient := NewMailgunClient(Conf)
-// 	// MailClient = &MailgunMailer{Conf, mailer} // global mailer object
-// }
-
 // setupListenerWithRetry
 // Runs the queue listener and controls connection retries
 func SetupListenerWithRetry() {
@@ -43,23 +37,22 @@ func SetupListenerWithRetry() {
 
 	for {
 		go func() {
-			var conn AmqpConnection
-			var client AmqpChannel
-			// conn, err := GetAMQPConnection(GetAMQPUrl(Conf))
-			conn, err := amqp.Dial(GetAMQPUrl(Conf))
+			amqpClient := &RabbitConnection{}
+			err := amqpClient.dial(GetAMQPUrl(Conf))
 			if err != nil {
 				log.Info().Msg("MAIN: Listener not connected")
 			}
-			client, err = GetAMQPChannel(conn)
+
+			err = amqpClient.getChannel()
 			if err != nil {
 				log.Info().Msg("MAIN: Channel not connected")
 			}
-			err = listener.Subscribe(client)
-			// err := listener.subscribe(retry)
-			// if err != nil {
-			// 	log.Info().Msg("MAIN: Listener not connected")
-			// 	retry <- dur
-			// }
+
+			err = listener.Subscribe(amqpClient)
+			if err != nil {
+				log.Info().Msg("MAIN: Listener not connected")
+				retry <- dur
+			}
 		}()
 
 		dur = <-retry // wait until disconnect
