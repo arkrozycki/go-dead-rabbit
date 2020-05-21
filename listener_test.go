@@ -1,6 +1,10 @@
 package main
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/streadway/amqp"
+)
 
 type (
 	MockAmqpConnection struct {
@@ -22,6 +26,16 @@ func (m *MockAmqpConnection) getChannel() error {
 	return nil
 }
 
+func (m *MockAmqpConnection) Close()                                        {}
+func (m *MockAmqpConnection) setQos(count int, size int, global bool) error { return nil }
+func (m *MockAmqpConnection) setQueue(string) error                         { return nil }
+func (m *MockAmqpConnection) setNotifyCloseChannel(chan *amqp.Error) chan *amqp.Error {
+	return make(chan *amqp.Error)
+}
+func (m *MockAmqpConnection) setMessages(q string) (<-chan amqp.Delivery, error) {
+	return make(<-chan amqp.Delivery), nil
+}
+
 // TestGetAMQPUrl
 func TestGetAMQPUrl(t *testing.T) {
 	expected := "amqp://tester:password@testServer:5672/vhost"
@@ -36,16 +50,6 @@ func TestGetAMQPUrl(t *testing.T) {
 func TestSubscribe(t *testing.T) {
 	var err error
 	mockClient := &MockAmqpConnection{}
-	err = mockClient.dial(GetAMQPUrl(MockConf))
-	if err != nil {
-		t.Errorf("mock dial failed")
-	}
-
-	err = mockClient.getChannel()
-	if err != nil {
-		t.Errorf("mock channel failed")
-	}
-
 	// init the Listener
 	listener := &Listener{
 		config: MockConf,
@@ -56,6 +60,11 @@ func TestSubscribe(t *testing.T) {
 	if err != nil {
 		t.Errorf("subscribe failed")
 	}
+}
+
+func TestRabbitConnectionDail(t *testing.T) {
+	var amqpClient = &RabbitConnection{}
+	amqpClient.dial("")
 }
 
 // import (

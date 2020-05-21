@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 
+	"github.com/rs/zerolog/log"
 	"github.com/streadway/amqp"
 )
 
@@ -10,11 +11,18 @@ type (
 	Amqp interface {
 		dial(string) error
 		getChannel() error
+		Close()
+		setQos(int, int, bool) error
+		setQueue(string) error
+		setNotifyCloseChannel(chan *amqp.Error) chan *amqp.Error
+		setMessages(string) (<-chan amqp.Delivery, error)
 	}
 
 	RabbitConnection struct {
-		connection *amqp.Connection
-		channel    *amqp.Channel
+		connection  *amqp.Connection
+		channel     *amqp.Channel
+		notifyClose chan *amqp.Error
+		queue       amqp.Queue
 	}
 )
 
@@ -32,6 +40,57 @@ func (r *RabbitConnection) getChannel() error {
 	return err
 }
 
+// Close
+func (r *RabbitConnection) Close() {
+	r.channel.Close()
+	r.connection.Close()
+}
+
+// setQos
+// Qos controls how many messages or how many bytes the server will try to keep on the network for consumers before receiving delivery acks. The intent of Qos is to make sure the network buffers stay full between the server and client
+func (r *RabbitConnection) setQos(count int, size int, global bool) error {
+	err := r.channel.Qos(
+		count,  // prefetch count
+		size,   // prefetch size
+		global, // global
+	)
+	return err
+}
+
+// setNotifyCloseChannel
+func (r *RabbitConnection) setNotifyCloseChannel(ch chan *amqp.Error) chan *amqp.Error {
+	return r.connection.NotifyClose(ch)
+}
+
+// setQueue
+// Connect to an existing queue, will throw if not exist
+func (r *RabbitConnection) setQueue(name string) error {
+	var err error
+	r.queue, err = r.channel.QueueDeclarePassive(
+		name,  // name
+		true,  // durable
+		false, // delete when unused
+		false, // exclusive
+		false, // no-wait
+		nil,   // arguments
+	)
+	return err
+}
+
+func (r *RabbitConnection) setMessages(qName string) (<-chan amqp.Delivery, error) {
+	msgs, err := r.channel.Consume(
+		qName, // queue
+		"",    // consumer
+		false, // auto-ack
+		false, // exclusive
+		false, // no-local
+		false, // no-wait
+		nil,   // args
+	)
+
+	return msgs, err
+}
+
 // amqpUrl
 // Generates a connection string from config
 func GetAMQPUrl(conf Config) string {
@@ -46,14 +105,96 @@ func GetAMQPUrl(conf Config) string {
 // Listener
 // Struct for the listener
 type Listener struct {
-	config Config
-	mail   MailClient
-	client Amqp
+	config   Config
+	mail     MailClient
+	client   Amqp
+	errChan  chan *amqp.Error
+	messages <-chan amqp.Delivery
 }
 
+// subscribe
+// Subscribes to a queue based on configuration.
+// Executes a connect, opens channel, consumes.
+// Handles disconnects via the NotifyError channel
 func (l *Listener) Subscribe(client Amqp) error {
 	var err error
 	l.client = client
+	err = l.connect()
+	return err
+}
+
+// connect
+// Establishes a connection to the AMQP host,
+// retrieves a channel,
+func (l *Listener) connect() error {
+	var err error
+
+	// client connect
+	err = l.client.dial(GetAMQPUrl(Conf))
+	if err != nil {
+		return err
+	}
+
+	// client channel
+	err = l.client.getChannel()
+	if err != nil {
+		return err
+	}
+
+	// client error / disconnect channel
+	l.errChan = l.client.setNotifyCloseChannel(make(chan *amqp.Error))
+
+	// configure
+	err = l.configure(1, 0, false)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// configure
+// configures the Qos on the channel,
+// sets the NotifyClose channel for detecting errors and disconnects
+func (l *Listener) configure(prefetchCount int, prefetchSize int, global bool) error {
+	var err error
+	// set the QoS for the channel
+	err = l.client.setQos(prefetchCount, prefetchSize, global)
+	if err != nil {
+		return err
+	}
+
+	// capture the error disconnect channel
+	// l.errorChan = l.client.getNotifyClose()
+
+	// configure the queue
+	err = l.client.setQueue(l.config.Listener.Queue.Name)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// consume
+// Consumes messages from the queue,
+// returns the channel used for receiving messages.
+func (l *Listener) consume() error {
+	var err error
+	// start consuming messages
+	log.Debug().Msg(l.config.Listener.Queue.Name)
+	l.messages, err = l.client.setMessages(l.config.Listener.Queue.Name)
+
+	// msgs, err := l.channel.Consume(
+	// 	l.config.Listener.Queue.Name, // queue
+	// 	"",                           // consumer
+	// 	false,                        // auto-ack
+	// 	false,                        // exclusive
+	// 	false,                        // no-local
+	// 	false,                        // no-wait
+	// 	nil,                          // args
+	// )
+
 	return err
 }
 
@@ -65,38 +206,12 @@ func (l *Listener) Subscribe(client Amqp) error {
 // Executes a connect, opens channel, consumes.
 // Handles disconnects via the NotifyError channel
 func (l *Listener) subscribe(retry chan<- int) error {
-	log.Debug().Msg("LISTENER: Starting up")
-
-	// connect to amqp
-	notify, err := l.connect()
-	if err != nil {
-		return err
-	}
-
-	// configure queue
-	err = l.configure()
-	if err != nil {
-		return err
-	}
 
 	// start consuming messages
 	msgs, err := l.consume()
 	if err != nil {
 		return err
 	}
-
-	defer l.channel.Close()
-	defer l.conn.Close()
-
-	// channel for monitoring disconnects and errors
-	disconnect := make(chan bool)
-	// connection error monitoring
-	go func() {
-		for e := range notify {
-			log.Error().Msgf("%v", e)
-			disconnect <- true
-		}
-	}()
 
 	// queue message processing
 	go func() {
@@ -154,90 +269,5 @@ func (l *Listener) amqpMessageHandler(message amqp.Delivery) error {
 	return err
 }
 
-// amqpUrl
-// Generates a connection string from config
-func (l *Listener) amqpUrl() string {
-	return fmt.Sprintf("amqp://%s:%s@%s:%s/%s",
-		l.config.Connection.User,
-		l.config.Connection.Password,
-		l.config.Connection.Server,
-		l.config.Connection.Port,
-		l.config.Connection.Vhost)
-}
 
-// connect
-// Establishes a connection to the AMQP host,
-// retrieves a channel,
-// configures the Qos on the channel,
-// returns the amqp.NotifyClose channel for detecting errors and disconnects
-func (l *Listener) connect() (chan *amqp.Error, error) {
-	var err error
-	// connect to rabbitmq
-	l.conn, err = amqp.Dial(l.amqpUrl())
-	if err != nil {
-		return nil, err
-	}
-	log.Info().Msgf("LISTENER: Connected with %s", l.amqpUrl())
-
-	// open channel from connection
-	l.channel, err = l.conn.Channel()
-	if err != nil {
-		return nil, err
-	}
-	log.Debug().Msg("LISTENER: Open channel success")
-
-	// set the QoS for the channel
-	// we will be pulling only 1 at a time for simplicity
-	err = l.channel.Qos(
-		1,     // prefetch count
-		0,     // prefetch size
-		false, // global
-	)
-
-	// capture the error disconnect channel
-	notify := l.conn.NotifyClose(make(chan *amqp.Error)) //error channel
-
-	return notify, err
-}
-
-// configure
-// Passively checks that the queue in configuration exists.
-// Note, the app does not create the queue nor the bindings, those
-// need to be preemptively configured.
-func (l *Listener) configure() error {
-	var err error
-	// Connect to an existing queue, will throw if not exist
-	l.queue, err = l.channel.QueueDeclarePassive(
-		l.config.Listener.Queue.Name, // name
-		true,                         // durable
-		false,                        // delete when unused
-		false,                        // exclusive
-		false,                        // no-wait
-		nil,                          // arguments
-	)
-	if err != nil {
-		return err
-	}
-	log.Debug().Msgf("LISTENER: Queue exists - %s", l.config.Listener.Queue.Name)
-
-	return err
-}
-
-// consume
-// Consumes messages from the queue,
-// returns the channel used for receiving messages.
-func (l *Listener) consume() (<-chan amqp.Delivery, error) {
-	// start consuming messages
-	msgs, err := l.channel.Consume(
-		l.config.Listener.Queue.Name, // queue
-		"",                           // consumer
-		false,                        // auto-ack
-		false,                        // exclusive
-		false,                        // no-local
-		false,                        // no-wait
-		nil,                          // args
-	)
-
-	return msgs, err
-}
 */

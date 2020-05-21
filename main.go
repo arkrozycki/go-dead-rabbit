@@ -26,44 +26,61 @@ func main() {
 // setupListenerWithRetry
 // Runs the queue listener and controls connection retries
 func SetupListenerWithRetry() {
-	dur := 1000             // the sleep time for retries
+	dur := 3000             // the sleep time for retries
 	retry := make(chan int) // a channel to communicate retries
-
-	// init the Listener
-	listener := &Listener{
-		config: Conf,
-		mail:   GetMailClient(Conf.Notification.Mailgun.Domain, Conf.Notification.Mailgun.ApiKey),
-	}
 
 	for {
 		go func() {
-			amqpClient := &RabbitConnection{}
-			err := amqpClient.dial(GetAMQPUrl(Conf))
-			if err != nil {
-				log.Info().Msg("MAIN: Listener not connected")
+			var err error
+
+			// init the Listener
+			listener := &Listener{
+				config: Conf,
+				mail:   GetMailClient(Conf.Notification.Mailgun.Domain, Conf.Notification.Mailgun.ApiKey),
 			}
 
-			err = amqpClient.getChannel()
-			if err != nil {
-				log.Info().Msg("MAIN: Channel not connected")
-			}
+			amqpClient := &RabbitConnection{} // amqp client
 
-			err = listener.Subscribe(amqpClient)
+			err = listener.Subscribe(amqpClient) // create listener, connect and configure
 			if err != nil {
-				log.Info().Msg("MAIN: Listener not connected")
+				log.Info().Err(err).Msg("error")
+				retry <- dur
+				return
+			} else {
+				log.Debug().Msg("MAIN: listener subscribed success")
+
+				// // channel for monitoring disconnects and errors
+				disconnect := make(chan bool)
+				// // connection error monitoring
+				go func() {
+					// errChan := listener.client.setNotifyCloseChannel(make(chan *amqp.Error))
+					log.Debug().Msg("MAIN: listening for disconnects")
+					err := <-listener.errChan
+					log.Error().Err(err).Msg("error")
+					disconnect <- true
+				}()
+
+				go func() {
+					err := listener.consume()
+					if err != nil {
+						log.Info().Err(err).Msg("error")
+					}
+					log.Debug().Msg("MAIN: listening for messages")
+					for msg := range listener.messages {
+						log.Debug().Msgf("received %v", msg)
+					}
+				}()
+
+				<-disconnect            // stop here until disconnect
+				listener.client.Close() // cleanup
+				log.Debug().Msg("MAIN: listener disconnected")
 				retry <- dur
 			}
 		}()
 
 		dur = <-retry // wait until disconnect
-
 		log.Debug().Msgf("MAIN: Retry listener connection in %vms", dur)
 		time.Sleep(time.Duration(dur) * time.Millisecond) // pause before reattempt connection
-		if dur < 128001 {
-			dur = dur * 2 // increase duration
-		} else {
-			dur = 180000 // fix duration at specific interval e.g. 3mins
-		}
 	}
 }
 
