@@ -67,7 +67,11 @@ func SetupListenerWithRetry() {
 					}
 					log.Debug().Msg("MAIN: listening for messages")
 					for msg := range listener.messages {
-						log.Debug().Msgf("received %v", msg)
+						err = listener.handle(msg)
+						if err != nil {
+							log.Info().Err(err).Msg("error")
+						}
+						msg.Ack(false)
 					}
 				}()
 

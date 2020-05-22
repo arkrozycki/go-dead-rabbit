@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 
 	"github.com/rs/zerolog/log"
@@ -164,9 +166,6 @@ func (l *Listener) configure(prefetchCount int, prefetchSize int, global bool) e
 		return err
 	}
 
-	// capture the error disconnect channel
-	// l.errorChan = l.client.getNotifyClose()
-
 	// configure the queue
 	err = l.client.setQueue(l.config.Listener.Queue.Name)
 	if err != nil {
@@ -181,64 +180,17 @@ func (l *Listener) configure(prefetchCount int, prefetchSize int, global bool) e
 // returns the channel used for receiving messages.
 func (l *Listener) consume() error {
 	var err error
-	// start consuming messages
 	log.Debug().Msg(l.config.Listener.Queue.Name)
 	l.messages, err = l.client.setMessages(l.config.Listener.Queue.Name)
-
-	// msgs, err := l.channel.Consume(
-	// 	l.config.Listener.Queue.Name, // queue
-	// 	"",                           // consumer
-	// 	false,                        // auto-ack
-	// 	false,                        // exclusive
-	// 	false,                        // no-local
-	// 	false,                        // no-wait
-	// 	nil,                          // args
-	// )
-
 	return err
 }
 
-/*
-
-
-// subscribe
-// Subscribes to a queue based on configuration.
-// Executes a connect, opens channel, consumes.
-// Handles disconnects via the NotifyError channel
-func (l *Listener) subscribe(retry chan<- int) error {
-
-	// start consuming messages
-	msgs, err := l.consume()
-	if err != nil {
-		return err
-	}
-
-	// queue message processing
-	go func() {
-		for msg := range msgs {
-			// listen on channel for new messages
-			log.Debug().Msgf("LISTENER: Msg received - %s", msg.MessageId)
-			err := l.amqpMessageHandler(msg)
-			if err != nil {
-				log.Error().Err(err)
-				msg.Ack(false)
-				continue
-			}
-
-			msg.Ack(false) // message acknowledgement
-		}
-	}()
-
-	<-disconnect  // stop here until disconnect
-	retry <- 1000 // reset the retry duration
-	return errors.New("disconnected")
-}
-
-// amqpMessageHandler
-// Processes the incoming messages
-func (l *Listener) amqpMessageHandler(message amqp.Delivery) error {
-	var err error
-
+// handle
+// AMQP message handler:
+// 	- Marshals to JSON and prettify
+//  - Saves to datastore
+// 	- Sends email notification
+func (l *Listener) handle(message amqp.Delivery) error {
 	headers, err := json.Marshal(message)
 
 	log.Debug().
@@ -264,10 +216,6 @@ func (l *Listener) amqpMessageHandler(message amqp.Delivery) error {
 		subject: message.RoutingKey,
 		body:    string(prettyJSON.Bytes()),
 	}
-	resp, id, err := SendMail(l.mail, msg)
-	log.Debug().Str("ID", id).Str("Resp", resp).Msgf("MAILER:")
+	_, _, err = SendMail(l.mail, msg)
 	return err
 }
-
-
-*/
