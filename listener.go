@@ -44,8 +44,12 @@ func (r *RabbitConnection) getChannel() error {
 
 // Close
 func (r *RabbitConnection) Close() {
-	r.channel.Close()
-	r.connection.Close()
+	if r.channel != nil {
+		r.channel.Close()
+	}
+	if r.connection != nil {
+		r.connection.Close()
+	}
 }
 
 // setQos
@@ -118,21 +122,21 @@ type Listener struct {
 // Subscribes to a queue based on configuration.
 // Executes a connect, opens channel, consumes.
 // Handles disconnects via the NotifyError channel
-func (l *Listener) Subscribe(client Amqp) error {
+func (l *Listener) Subscribe(client Amqp, connectUri string) error {
 	var err error
 	l.client = client
-	err = l.connect()
+	err = l.connect(connectUri)
 	return err
 }
 
 // connect
 // Establishes a connection to the AMQP host,
 // retrieves a channel,
-func (l *Listener) connect() error {
+func (l *Listener) connect(connectUri string) error {
 	var err error
 
 	// client connect
-	err = l.client.dial(GetAMQPUrl(Conf))
+	err = l.client.dial(connectUri)
 	if err != nil {
 		return err
 	}
@@ -180,8 +184,22 @@ func (l *Listener) configure(prefetchCount int, prefetchSize int, global bool) e
 // returns the channel used for receiving messages.
 func (l *Listener) consume() error {
 	var err error
-	log.Debug().Msg(l.config.Listener.Queue.Name)
-	l.messages, err = l.client.setMessages(l.config.Listener.Queue.Name)
+	log.Debug().Str("queue", l.config.Listener.Queue.Name).Msg("LISTENER: consume")
+	messages, err := l.client.setMessages(l.config.Listener.Queue.Name)
+	if err != nil {
+		log.Info().Err(err).Msg("error")
+		return err
+	}
+
+	for msg := range messages {
+		log.Debug().Msg("new message received")
+		err = l.handle(msg)
+		if err != nil {
+			log.Info().Err(err).Msg("error")
+		}
+		msg.Ack(false)
+	}
+
 	return err
 }
 
@@ -218,4 +236,11 @@ func (l *Listener) handle(message amqp.Delivery) error {
 	}
 	_, _, err = SendMail(l.mail, msg)
 	return err
+}
+
+func (l *Listener) monitor(disconn chan bool) {
+	log.Debug().Msg("LISTENER: listening for disconnects")
+	err := <-l.errChan
+	log.Error().Err(err).Msg("error")
+	disconn <- true
 }
