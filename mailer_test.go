@@ -22,12 +22,6 @@ func (m *MockMailClient) Send(ctx context.Context, message *mailgun.Message) (st
 
 var MockMailer MailClient
 
-func GetMockMailClient() MailClient {
-	var m MailClient
-	m = &MockMailClient{}
-	return m
-}
-
 // TestSendMail
 func TestSendMailSuccess(t *testing.T) {
 	MockMailer = &MockMailClient{}
@@ -41,8 +35,9 @@ func TestSendMailSuccess(t *testing.T) {
 
 	_, _, actual := SendMail(MockMailer, msg)
 	if actual != nil {
-		t.Errorf("actual: %s, expected: %v.", actual, nil)
+		t.Errorf("%s actual: %s, expected: %v.", failed, actual, nil)
 	}
+	t.Logf("%s Mail client send", succeed)
 }
 
 //  TestGetMailClient
@@ -50,6 +45,7 @@ func TestGetMailClient(t *testing.T) {
 	c := mailgun.NewMailgun("", "")
 	m := GetMailClient("", "")
 	if reflect.TypeOf(m) != reflect.TypeOf(c) {
-		t.Errorf("%s", reflect.TypeOf(m))
+		t.Errorf("%s %s", failed, reflect.TypeOf(m))
 	}
+	t.Logf("%s Mail client returned", succeed)
 }

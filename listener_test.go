@@ -46,19 +46,10 @@ func TestGetAMQPUrl(t *testing.T) {
 	actual := GetAMQPUrl(MockConf)
 
 	if actual != expected {
-		t.Errorf("actual: %s, expected: %s.", actual, expected)
+		t.Errorf("%s actual: %s, expected: %s.", failed, actual, expected)
 	}
+	t.Logf("%s AMQP Uri correct", succeed)
 }
-
-// func TestSetMessages(t *testing.T) {
-// 	var client = &RabbitConnection{
-// 		channel: &amqp.Channel{},
-// 	}
-// 	_, err := client.setMessages("")
-// 	if err != nil {
-
-// 	}
-// }
 
 // TestSubscribe
 func TestSubscribe(t *testing.T) {
@@ -71,30 +62,10 @@ func TestSubscribe(t *testing.T) {
 
 	err = listener.Subscribe(mockClient, "")
 	if err != nil {
-		t.Errorf("subscribe failed")
+		t.Errorf("%s Subscribe failed", failed)
 	}
+	t.Logf("%s Subscribe success", succeed)
 }
-
-// TestListenerConsume
-// func TestListenerConsume(t *testing.T) {
-// 	var err error
-// 	mockClient := &MockAmqpConnection{}
-// 	// init the Listener
-// 	listener := &Listener{
-// 		config: MockConf,
-// 		mail:   &MockMailClient{},
-// 	}
-
-// 	err = listener.Subscribe(mockClient)
-// 	if err != nil {
-// 		t.Errorf("subscribe failed")
-// 	}
-
-// 	err = listener.consume()
-// 	if err != nil {
-// 		t.Errorf("%v", err)
-// 	}
-// }
 
 // // TestAmqpMessageHandler
 func TestListenerHandle(t *testing.T) {
@@ -117,6 +88,7 @@ func TestListenerHandle(t *testing.T) {
 
 	err := listener.handle(msg)
 	if err != nil {
-		t.Errorf("actual: %v, expected: nil", err)
+		t.Errorf("%s actual: %v, expected: nil", failed, err)
 	}
+	t.Logf("%s Message handled", succeed)
 }

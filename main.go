@@ -10,7 +10,7 @@ import (
 )
 
 // main
-// Because its main
+// Because it is main
 func main() {
 	log.Info().Msg("Go-Dead-Rabbit Starting")
 
@@ -30,7 +30,7 @@ func main() {
 }
 
 // setupListenerWithRetry
-// Runs the queue listener and controls connection retries
+// Executes the queue listener and controls connection retries
 func ExecuteListenerWithRetry(listener *Listener, amqpClient Amqp, connectUri string) {
 	dur := 3000                      // the sleep time for retries
 	retry := make(chan bool, 1)      // a channel to communicate retries
@@ -43,6 +43,8 @@ func ExecuteListenerWithRetry(listener *Listener, amqpClient Amqp, connectUri st
 
 }
 
+// ListenerExec
+// Subscribes, monitors and consumes from the amqp client and queue
 func ListenerExec(listener *Listener, amqpClient Amqp, connectUri string, retry chan bool, disconnect chan bool) error {
 	var err error
 	err = listener.Subscribe(amqpClient, connectUri) // create listener, connect and configure

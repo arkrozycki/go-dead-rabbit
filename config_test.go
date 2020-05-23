@@ -12,4 +12,6 @@ var MockConf = Config{
 	},
 }
 
-func TestInit(t *testing.T) {}
+func TestInit(t *testing.T) {
+	t.Logf("%s Test init-ed", succeed)
+}
