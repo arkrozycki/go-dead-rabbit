@@ -13,3 +13,9 @@ notification:
     to:  "ark@bstock.com"
     # MAILGUN_API_KEY is a requied environment variable
     # MAILGUN_API_DOMAIN is a required environment variable
+
+datastore:
+  mongodb:
+    database: go-dead-rabbit
+    collection: message
+    uri: "mongodb://user:password@gdr_mongodb:27017/go-dead-rabbit"

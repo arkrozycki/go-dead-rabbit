@@ -29,6 +29,7 @@ type (
 )
 
 // dial
+// connects to the amqp host
 func (r *RabbitConnection) dial(uri string) error {
 	var err error
 	r.connection, err = amqp.Dial(uri)
@@ -36,6 +37,7 @@ func (r *RabbitConnection) dial(uri string) error {
 }
 
 // channel
+// retrieves a channel from the connection
 func (r *RabbitConnection) getChannel() error {
 	var err error
 	r.channel, err = r.connection.Channel()
@@ -43,6 +45,7 @@ func (r *RabbitConnection) getChannel() error {
 }
 
 // Close
+// Closes the channel and connection
 func (r *RabbitConnection) Close() {
 	if r.channel != nil {
 		r.channel.Close()
@@ -55,15 +58,15 @@ func (r *RabbitConnection) Close() {
 // setQos
 // Qos controls how many messages or how many bytes the server will try to keep on the network for consumers before receiving delivery acks. The intent of Qos is to make sure the network buffers stay full between the server and client
 func (r *RabbitConnection) setQos(count int, size int, global bool) error {
-	err := r.channel.Qos(
+	return r.channel.Qos(
 		count,  // prefetch count
 		size,   // prefetch size
 		global, // global
 	)
-	return err
 }
 
 // setNotifyCloseChannel
+// returns the error/disconnect channel
 func (r *RabbitConnection) setNotifyCloseChannel(ch chan *amqp.Error) chan *amqp.Error {
 	return r.connection.NotifyClose(ch)
 }
@@ -83,8 +86,10 @@ func (r *RabbitConnection) setQueue(name string) error {
 	return err
 }
 
+// setMessages
+// Starts consuming messages from the queue
 func (r *RabbitConnection) setMessages(qName string) (<-chan amqp.Delivery, error) {
-	msgs, err := r.channel.Consume(
+	return r.channel.Consume(
 		qName, // queue
 		"",    // consumer
 		false, // auto-ack
@@ -93,8 +98,6 @@ func (r *RabbitConnection) setMessages(qName string) (<-chan amqp.Delivery, erro
 		false, // no-wait
 		nil,   // args
 	)
-
-	return msgs, err
 }
 
 // amqpUrl
@@ -113,6 +116,7 @@ func GetAMQPUrl(conf Config) string {
 type Listener struct {
 	config   Config
 	mail     MailClient
+	ds       DatastoreClientHelper
 	client   Amqp
 	errChan  chan *amqp.Error
 	messages <-chan amqp.Delivery
@@ -123,10 +127,8 @@ type Listener struct {
 // Executes a connect, opens channel, consumes.
 // Handles disconnects via the NotifyError channel
 func (l *Listener) Subscribe(client Amqp, connectUri string) error {
-	var err error
 	l.client = client
-	err = l.connect(connectUri)
-	return err
+	return l.connect(connectUri)
 }
 
 // connect
@@ -151,12 +153,7 @@ func (l *Listener) connect(connectUri string) error {
 	l.errChan = l.client.setNotifyCloseChannel(make(chan *amqp.Error))
 
 	// configure
-	err = l.configure(1, 0, false)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return l.configure(1, 0, false)
 }
 
 // configure
@@ -171,12 +168,7 @@ func (l *Listener) configure(prefetchCount int, prefetchSize int, global bool) e
 	}
 
 	// configure the queue
-	err = l.client.setQueue(l.config.Listener.Queue.Name)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return l.client.setQueue(l.config.Listener.Queue.Name)
 }
 
 // consume
@@ -209,10 +201,10 @@ func (l *Listener) consume() error {
 //  - Saves to datastore
 // 	- Sends email notification
 func (l *Listener) handle(message amqp.Delivery) error {
-	headers, err := json.Marshal(message)
+	messageJSON, err := json.Marshal(message)
 
 	log.Debug().
-		RawJSON("Headers", headers).
+		RawJSON("Headers", messageJSON).
 		Str("CorrelationId", message.CorrelationId).
 		Str("ReplyTo", message.ReplyTo).
 		Str("MessageId", message.MessageId).
@@ -221,8 +213,17 @@ func (l *Listener) handle(message amqp.Delivery) error {
 		Str("Exchange", message.Exchange).
 		Msg("LISTENER:")
 
+	err = l.mailJSON(message.RoutingKey, messageJSON) // mailer
+	err = l.ds.Insert(messageJSON)                    // persist to storage
+	return err
+}
+
+// mailJSON
+// Formats JSON for pretty
+// Sends email to configured destination
+func (l *Listener) mailJSON(subject string, body []byte) error {
 	var prettyJSON bytes.Buffer
-	err = json.Indent(&prettyJSON, headers, "", "\t")
+	err := json.Indent(&prettyJSON, body, "", "\t")
 	if err != nil {
 		return err
 	}
@@ -231,13 +232,15 @@ func (l *Listener) handle(message amqp.Delivery) error {
 	msg := &Message{
 		from:    Conf.Notification.Mailgun.From,
 		to:      Conf.Notification.Mailgun.To,
-		subject: message.RoutingKey,
+		subject: subject,
 		body:    string(prettyJSON.Bytes()),
 	}
 	_, _, err = SendMail(l.mail, msg)
 	return err
 }
 
+// monitor
+// Monitors the listener for errors and disconnects
 func (l *Listener) monitor(disconn chan bool) {
 	log.Debug().Msg("LISTENER: listening for disconnects")
 	err := <-l.errChan

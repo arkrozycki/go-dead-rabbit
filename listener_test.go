@@ -80,10 +80,16 @@ func TestListenerHandle(t *testing.T) {
 		Body:          []byte("fake data"),
 	}
 
+	// mc := &MockDatastoreClient{}
 	// init the Listener
 	listener := &Listener{
 		config: MockConf,
 		mail:   &MockMailClient{},
+		ds: &MockMongoClient{
+			cl:      &MockDSClient{},
+			dbname:  "testdb",
+			colname: "testCollection",
+		},
 	}
 
 	err := listener.handle(msg)

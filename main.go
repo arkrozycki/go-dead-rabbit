@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // main
@@ -14,10 +16,26 @@ import (
 func main() {
 	log.Info().Msg("Go-Dead-Rabbit Starting")
 
+	// get a mail client
+	mailClient := GetMailClient(Conf.Notification.Mailgun.Domain, Conf.Notification.Mailgun.ApiKey)
+
+	// get the datastore client
+	var datastoreClient DatastoreClientHelper
+	mcl, err := mongo.NewClient(options.Client().ApplyURI(Conf.Datastore.Mongodb.Uri))
+	if err != nil {
+		log.Error().Err(err).Msg("error")
+	}
+	datastoreClient = &MongoClient{
+		cl:      mcl,
+		dbname:  Conf.Datastore.Mongodb.Database,
+		colname: Conf.Datastore.Mongodb.Collection,
+	}
+
 	// init the Listener
 	listener := &Listener{
 		config: Conf,
-		mail:   GetMailClient(Conf.Notification.Mailgun.Domain, Conf.Notification.Mailgun.ApiKey),
+		mail:   mailClient,
+		ds:     datastoreClient,
 	}
 
 	ExecuteListenerWithRetry(listener, &RabbitConnection{}, GetAMQPUrl(Conf)) // turn up queue listener

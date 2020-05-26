@@ -19,6 +19,7 @@ type Config struct {
 	Listener     ListenerConfig
 	Publisher    PublisherConfig
 	Notification NotificationConfig
+	Datastore    DatastoreConfig
 }
 
 type ConnectionConfig struct {
@@ -55,6 +56,16 @@ type MailgunConfig struct {
 	Domain  string
 	From    string
 	To      string
+}
+
+type DatastoreConfig struct {
+	Mongodb MongodbConfig
+}
+
+type MongodbConfig struct {
+	Database   string
+	Collection string
+	Uri        string
 }
 
 var Conf Config
