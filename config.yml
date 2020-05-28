@@ -18,4 +18,4 @@ datastore:
   mongodb:
     database: go-dead-rabbit
     collection: message
-    uri: "mongodb://user:password@gdr_mongodb:27017/go-dead-rabbit"
+    uri: "mongodb://user:password@host.docker.internal:27017/go-dead-rabbit"

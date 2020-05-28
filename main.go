@@ -32,7 +32,7 @@ func main() {
 		ds:     datastoreClient,
 	}
 
-	go ExecuteApi()
+	go ExecuteApi(datastoreClient)
 	go ExecuteListenerWithRetry(listener, &RabbitConnection{}, GetAMQPUrl(Conf)) // turn up queue listener                                                               // turn up REST API
 
 	// Run continuously until interrupt
@@ -79,8 +79,8 @@ func ListenerExec(listener *Listener, amqpClient Amqp, connectUri string, retry 
 
 // setupApi
 // Runs the RESTful API
-func ExecuteApi() {
-	api := &Server{Conf}
+func ExecuteApi(d DatastoreClientHelper) {
+	api := &Server{Conf, d}
 	http.Handle("/", api)
 	err := http.ListenAndServe(":8567", nil)
 	if err != nil {

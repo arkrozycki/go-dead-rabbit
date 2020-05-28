@@ -1,6 +1,8 @@
 package main
 
-import "context"
+import (
+	"context"
+)
 
 type MockDatastoreClient struct{}
 
@@ -40,4 +42,8 @@ func (m *MockMongoClientHelper) Database(name string) DatabaseHelper {
 
 func (m *MockMongoClientHelper) Insert(doc []byte) error {
 	return nil
+}
+
+func (m *MockMongoClientHelper) Count() (int64, error) {
+	return int64(10), nil
 }

@@ -12,10 +12,11 @@ import (
 
 // DatastoreClientHelper
 type DatastoreClientHelper interface {
-	Connect(context.Context) error
+	Connect() error
 	Disconnect(context.Context) error
 	Database(string) DatabaseHelper
 	Insert([]byte) error
+	Count() (int64, error)
 }
 
 // DatabaseHelper
@@ -26,6 +27,7 @@ type DatabaseHelper interface {
 // CollectionHelper
 type CollectionHelper interface {
 	InsertOne(context.Context, interface{}) (interface{}, error)
+	CountDocuments(context.Context) (int64, error)
 }
 
 // MongoClientHelper
@@ -36,13 +38,31 @@ type MongoClientHelper struct {
 }
 
 // Connect
-func (m *MongoClientHelper) Connect(ctx context.Context) error {
-	return m.cl.Connect(context.Background())
+func (m *MongoClientHelper) Connect() error {
+	var err error
+	// Check the connection
+	ctxPing, _ := context.WithTimeout(context.Background(), 5*time.Second)
+	err = m.cl.Ping(ctxPing, nil)
+	// if not connected go ahead and connect
+	if err != nil {
+		log.Debug().Msg("Connecting to datastore...")
+		err = m.cl.Connect(context.Background())
+		if err != nil {
+			log.Info().Err(err).Msg("error: connect")
+		}
+	}
+
+	return err
 }
 
 // Disconnect
 func (m *MongoClientHelper) Disconnect(ctx context.Context) error {
-	return m.cl.Disconnect(context.Background())
+	log.Debug().Msg("Disconnecting ...")
+	err := m.cl.Disconnect(ctx)
+	if err != nil {
+		log.Info().Err(err).Msg("error")
+	}
+	return err
 }
 
 // Database
@@ -51,21 +71,33 @@ func (m *MongoClientHelper) Database(name string) DatabaseHelper {
 	return &mongoDatabase{db: db}
 }
 
+// count
+func (m *MongoClientHelper) Count() (int64, error) {
+	err := m.Connect()
+	if err != nil {
+		return 0, err
+	}
+
+	db := m.Database(m.dbname)
+	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+	cnt, err := db.Collection(m.colname).CountDocuments(ctx)
+	return cnt, err
+}
+
 // Insert
 func (m *MongoClientHelper) Insert(doc []byte) error {
-	ctx, _ := context.WithTimeout(context.Background(), 10*time.Second)
-	err := m.Connect(ctx)
+	err := m.Connect()
 	if err != nil {
 		return err
 	}
 	db := m.Database(m.dbname)
 	var bdoc interface{}
 	err = bson.UnmarshalJSON(doc, &bdoc)
-	id, err := db.Collection(m.colname).InsertOne(context.Background(), bdoc)
+	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
+	id, err := db.Collection(m.colname).InsertOne(ctx, bdoc)
 	if err == nil {
 		log.Debug().Msgf("DATASTORE: inserted record %v", id)
 	}
-	defer m.Disconnect(ctx)
 	return err
 }
 
@@ -89,6 +121,11 @@ type mongoCollection struct {
 func (mc *mongoCollection) InsertOne(ctx context.Context, document interface{}) (interface{}, error) {
 	id, err := mc.coll.InsertOne(ctx, document)
 	return id, err
+}
+
+// CountDocuments
+func (mc *mongoCollection) CountDocuments(ctx context.Context) (int64, error) {
+	return mc.coll.CountDocuments(ctx, bson.M{}, nil)
 }
 
 // GetDatastoreClient
