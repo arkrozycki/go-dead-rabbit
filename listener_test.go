@@ -85,8 +85,8 @@ func TestListenerHandle(t *testing.T) {
 	listener := &Listener{
 		config: MockConf,
 		mail:   &MockMailClient{},
-		ds: &MockMongoClient{
-			cl:      &MockDSClient{},
+		ds: &MockMongoClientHelper{
+			cl:      &MockDatastoreClient{},
 			dbname:  "testdb",
 			colname: "testCollection",
 		},

@@ -9,6 +9,18 @@ import (
 	"github.com/streadway/amqp"
 )
 
+// Listener
+// Struct for the listener
+type Listener struct {
+	config   Config
+	mail     MailClient
+	ds       DatastoreClientHelper
+	client   Amqp
+	errChan  chan *amqp.Error
+	messages <-chan amqp.Delivery
+}
+
+// Amqp
 type (
 	Amqp interface {
 		dial(string) error
@@ -109,17 +121,6 @@ func GetAMQPUrl(conf Config) string {
 		conf.Connection.Server,
 		conf.Connection.Port,
 		conf.Connection.Vhost)
-}
-
-// Listener
-// Struct for the listener
-type Listener struct {
-	config   Config
-	mail     MailClient
-	ds       DatastoreClientHelper
-	client   Amqp
-	errChan  chan *amqp.Error
-	messages <-chan amqp.Delivery
 }
 
 // subscribe

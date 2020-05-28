@@ -7,10 +7,10 @@ import (
 const succeed = "\u2713"
 const failed = "\u2717"
 
-func TestSetupApi(t *testing.T) {
-	SetupApi()
-	t.Logf("%s API setup", succeed)
-}
+// func TestExecuteApi(t *testing.T) {
+// 	ExecuteApi()
+// 	t.Logf("%s API setup", succeed)
+// }
 
 func TestListenerExec(t *testing.T) {
 	mockClient := &MockAmqpConnection{}

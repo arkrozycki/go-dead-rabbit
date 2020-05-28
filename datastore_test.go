@@ -2,26 +2,42 @@ package main
 
 import "context"
 
-type MockDSClient struct{}
+type MockDatastoreClient struct{}
 
-type MockMongoClient struct {
-	cl      *MockDSClient
+func (m *MockDatastoreClient) Connect(ctx context.Context) error {
+	return nil
+}
+
+func (m *MockDatastoreClient) Disconnect(ctx context.Context) error {
+	return nil
+}
+
+func (m *MockDatastoreClient) Database(name string) DatabaseHelper {
+	return nil
+}
+
+func (m *MockDatastoreClient) Insert(doc []byte) error {
+	return nil
+}
+
+type MockMongoClientHelper struct {
+	cl      *MockDatastoreClient
 	dbname  string
 	colname string
 }
 
-func (m *MockMongoClient) Connect(ctx context.Context) error {
+func (m *MockMongoClientHelper) Connect(ctx context.Context) error {
 	return nil
 }
 
-func (m *MockMongoClient) Disconnect(ctx context.Context) error {
+func (m *MockMongoClientHelper) Disconnect(ctx context.Context) error {
 	return nil
 }
 
-func (m *MockMongoClient) Database(name string) DatabaseHelper {
+func (m *MockMongoClientHelper) Database(name string) DatabaseHelper {
 	return nil
 }
 
-func (m *MockMongoClient) Insert(doc []byte) error {
+func (m *MockMongoClientHelper) Insert(doc []byte) error {
 	return nil
 }

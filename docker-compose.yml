@@ -11,6 +11,8 @@ services:
     environment:
       MAILGUN_API_KEY: "${MAILGUN_API_KEY}"
       MAILGUN_API_DOMAIN: "${MAILGUN_API_DOMAIN}"
+    ports:
+      - 8567:8567
     volumes:
       - .:/go/src/github.com/arkrozycki/go-dead-rabbit
       - go-modules:/go/pkg/mod

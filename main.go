@@ -1,14 +1,13 @@
 package main
 
 import (
+	"net/http"
 	"os"
 	"os/signal"
 	"strconv"
 	"time"
 
 	"github.com/rs/zerolog/log"
-	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // main
@@ -20,15 +19,10 @@ func main() {
 	mailClient := GetMailClient(Conf.Notification.Mailgun.Domain, Conf.Notification.Mailgun.ApiKey)
 
 	// get the datastore client
-	var datastoreClient DatastoreClientHelper
-	mcl, err := mongo.NewClient(options.Client().ApplyURI(Conf.Datastore.Mongodb.Uri))
+	datastoreClient, err := GetDatastoreClient(Conf.Datastore.Mongodb.Uri)
 	if err != nil {
 		log.Error().Err(err).Msg("error")
-	}
-	datastoreClient = &MongoClient{
-		cl:      mcl,
-		dbname:  Conf.Datastore.Mongodb.Database,
-		colname: Conf.Datastore.Mongodb.Collection,
+		log.Panic()
 	}
 
 	// init the Listener
@@ -38,8 +32,8 @@ func main() {
 		ds:     datastoreClient,
 	}
 
-	ExecuteListenerWithRetry(listener, &RabbitConnection{}, GetAMQPUrl(Conf)) // turn up queue listener
-	SetupApi()                                                                // turn up REST API
+	go ExecuteApi()
+	go ExecuteListenerWithRetry(listener, &RabbitConnection{}, GetAMQPUrl(Conf)) // turn up queue listener                                                               // turn up REST API
 
 	// Run continuously until interrupt
 	sig := make(chan os.Signal)
@@ -85,10 +79,12 @@ func ListenerExec(listener *Listener, amqpClient Amqp, connectUri string, retry 
 
 // setupApi
 // Runs the RESTful API
-func SetupApi() {
+func ExecuteApi() {
 	api := &Server{Conf}
-	err := api.start()
+	http.Handle("/", api)
+	err := http.ListenAndServe(":8567", nil)
 	if err != nil {
-		log.Error().Err(err)
+		log.Error().Err(err).Msg("error")
+		log.Panic()
 	}
 }
