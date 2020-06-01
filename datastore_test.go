@@ -28,7 +28,7 @@ type MockMongoClientHelper struct {
 	colname string
 }
 
-func (m *MockMongoClientHelper) Connect(ctx context.Context) error {
+func (m *MockMongoClientHelper) Connect() error {
 	return nil
 }
 

@@ -214,8 +214,12 @@ func (l *Listener) handle(message amqp.Delivery) error {
 		Str("Exchange", message.Exchange).
 		Msg("LISTENER:")
 
-	err = l.mailJSON(message.RoutingKey, messageJSON) // mailer
-	err = l.ds.Insert(messageJSON)                    // persist to storage
+	id, err := l.ds.Insert(messageJSON) // persist to storage
+	if err != nil {
+		return err
+	}
+
+	err = l.mailJSON(message.RoutingKey+":"+id, messageJSON) // mailer
 	return err
 }
 

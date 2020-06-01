@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog/log"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 	"gopkg.in/mgo.v2/bson"
@@ -15,7 +16,7 @@ type DatastoreClientHelper interface {
 	Connect() error
 	Disconnect(context.Context) error
 	Database(string) DatabaseHelper
-	Insert([]byte) error
+	Insert([]byte) (string, error)
 	Count() (int64, error)
 }
 
@@ -26,7 +27,7 @@ type DatabaseHelper interface {
 
 // CollectionHelper
 type CollectionHelper interface {
-	InsertOne(context.Context, interface{}) (interface{}, error)
+	InsertOne(context.Context, interface{}) (string, error)
 	CountDocuments(context.Context) (int64, error)
 }
 
@@ -85,20 +86,22 @@ func (m *MongoClientHelper) Count() (int64, error) {
 }
 
 // Insert
-func (m *MongoClientHelper) Insert(doc []byte) error {
+func (m *MongoClientHelper) Insert(doc []byte) (string, error) {
 	err := m.Connect()
 	if err != nil {
-		return err
+		return "", err
 	}
 	db := m.Database(m.dbname)
 	var bdoc interface{}
 	err = bson.UnmarshalJSON(doc, &bdoc)
 	ctx, _ := context.WithTimeout(context.Background(), 5*time.Second)
-	id, err := db.Collection(m.colname).InsertOne(ctx, bdoc)
+	result, err := db.Collection(m.colname).InsertOne(ctx, bdoc)
+
 	if err == nil {
-		log.Debug().Msgf("DATASTORE: inserted record %v", id)
+		log.Debug().Msgf("DATASTORE: inserted record %v", result)
 	}
-	return err
+
+	return result, err
 }
 
 // mongoDatabase
@@ -118,9 +121,10 @@ type mongoCollection struct {
 }
 
 // InsertOne
-func (mc *mongoCollection) InsertOne(ctx context.Context, document interface{}) (interface{}, error) {
-	id, err := mc.coll.InsertOne(ctx, document)
-	return id, err
+func (mc *mongoCollection) InsertOne(ctx context.Context, document interface{}) (string, error) {
+	result, err := mc.coll.InsertOne(ctx, document)
+	objectID := result.InsertedID.(primitive.ObjectID)
+	return objectID.String(), err
 }
 
 // CountDocuments
